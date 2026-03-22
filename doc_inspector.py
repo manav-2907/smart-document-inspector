@@ -101,38 +101,54 @@ def doc_inspector(img_path):
     }
 
     payload = {
-        "model": "gpt-5.2",
-        "input": [
+        "model": "gpt-4o-mini",  # Fixed: Using correct model name
+        "messages": [  # Fixed: Changed from 'input' to 'messages'
             {
                 "role": "user",
                 "content": [
                     {
-                        'type': 'input_text',
+                        "type": "text",  # Fixed: Changed from 'input_text' to 'text'
                         "text": prompt
                     },
                     {
-                        'type': 'input_image',
-                        'image_url': f"data:image/jpeg;base64,{image_base64}"
+                        "type": "image_url",  # Fixed: Changed from 'input_image' to 'image_url'
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64}"
+                        }
                     }
                 ]
             }
         ],
+        "max_tokens": 1000,
         "temperature": 0
     }
 
-    response = requests.post(url="https://api.openai.com/v1/responses", headers=headers, json=payload)
+    # Fixed: Correct API endpoint
+    response = requests.post(
+        url="https://api.openai.com/v1/chat/completions", 
+        headers=headers, 
+        json=payload
+    )
+    
     resp = response.json()
-    raw = resp["output"][0]["content"][0]["text"]
-    try:
-        # Strip markdown code fences if present
-        clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        data = json.loads(clean)
-    except:
-        print("Model returned invalid JSON")
-        print(raw)
-        data = None
+    
+    # Fixed: Correct response parsing
+    if "choices" in resp and len(resp["choices"]) > 0:
+        raw = resp["choices"][0]["message"]["content"]
+        try:
+            # Strip markdown code fences if present
+            clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            data = json.loads(clean)
+            return data
+        except Exception as e:
+            print(f"JSON parsing error: {e}")
+            print(f"Raw response: {raw}")
+            return {"error": "Failed to parse JSON", "raw_response": raw}
+    else:
+        print(f"API Error: {resp}")
+        return {"error": "API request failed", "details": resp}
 
-    return data
-
-# if __name__ == "__main__":
-#     doc_inspector('reciept.jpg')
+if __name__ == "__main__":
+    # Test with a sample image
+    result = doc_inspector('receipt.jpg')
+    print(json.dumps(result, indent=2))
